@@ -1,0 +1,21 @@
+# Maven
+target/
+*.class
+
+# Application secrets
+application.properties
+*.env
+.env
+
+# Archive and logs — local only
+archive/
+logs/
+
+# IDE
+.vscode/
+.cursor/
+*.iml
+.idea/
+
+# OS
+.DS_Store
