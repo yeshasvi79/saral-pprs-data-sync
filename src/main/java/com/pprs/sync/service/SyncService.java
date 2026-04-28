@@ -11,9 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.io.BufferedWriter;
+
+import com.pprs.sync.model.BseDailyPrice;
 import com.pprs.sync.model.Security;
 import com.pprs.sync.repository.SecurityRepository;
 import com.pprs.sync.fetcher.NseFetcher;
+import com.pprs.sync.fetcher.BseDailyPriceFetcher;
 import com.pprs.sync.fetcher.BseFetcher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,15 +27,18 @@ public class SyncService {
 
     private final NseFetcher nseFetcher;
     private final BseFetcher bseFetcher;
+    private final BseDailyPriceFetcher bseDailyPriceFetcher;
     private final JdbcTemplate jdbcTemplate;
 
     @Value("${app.archive.dir}")
     private String archiveDir;
 
     public SyncService(NseFetcher nseFetcher, BseFetcher bseFetcher,
+        BseDailyPriceFetcher bseDailyPriceFetcher,
                        JdbcTemplate jdbcTemplate) {
         this.nseFetcher  = nseFetcher;
         this.bseFetcher  = bseFetcher;
+        this.bseDailyPriceFetcher = bseDailyPriceFetcher;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -47,6 +53,18 @@ public class SyncService {
             face_value        = EXCLUDED.face_value,
             source_updated_at = EXCLUDED.source_updated_at,
             updated_at        = NOW()
+        """;
+
+    private static final String DAILY_PRICE_UPSERT_SQL = """
+        INSERT INTO bse_daily_price
+            (code, isin, name, open, high, low, close, prev_close,
+                volume, turnover, total_trades, trade_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (code, trade_date) DO UPDATE SET
+            close        = EXCLUDED.close,
+            volume       = EXCLUDED.volume,
+            turnover     = EXCLUDED.turnover,
+            total_trades = EXCLUDED.total_trades
         """;
 
     public void sync(String exchange) {
@@ -80,6 +98,30 @@ public class SyncService {
         jdbcTemplate.batchUpdate(UPSERT_SQL, batchArgs);
     }
 
+    public void syncDailyPrice() {
+        try {
+            List<BseDailyPrice> records = bseDailyPriceFetcher.fetchLatest();
+            upsertDailyPrice(records);
+            log.info("BSE daily price: upserted {} records for {}",
+                records.size(), records.get(0).getTradeDate());
+        } catch (Exception e) {
+            log.error("BSE daily price sync failed", e);
+        }
+    }
+    
+    private void upsertDailyPrice(List<BseDailyPrice> records) {
+        List<Object[]> args = records.stream()
+            .map(r -> new Object[]{
+                r.getCode(), r.getIsin(), r.getName(),
+                r.getOpen(), r.getHigh(), r.getLow(),
+                r.getClose(), r.getPrevClose(),
+                r.getVolume(), r.getTurnover(),
+                r.getTotalTrades(), r.getTradeDate()
+            })
+            .toList();
+        jdbcTemplate.batchUpdate(DAILY_PRICE_UPSERT_SQL, args);
+    }
+    
     private void archive(List<Security> data, String exchange) throws IOException {
         Path dir = Paths.get(archiveDir);
         Files.createDirectories(dir);

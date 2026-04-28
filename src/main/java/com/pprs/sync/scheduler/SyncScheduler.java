@@ -20,8 +20,9 @@ public class SyncScheduler {
     @Scheduled(cron = "0 30 7 * * MON-FRI", zone = "Asia/Kolkata")
     public void runDailySync() {
         log.info("Starting daily sync...");
-        syncService.sync("NSE");
-        syncService.sync("BSE");
+        // syncService.sync("NSE");
+        // syncService.sync("BSE");
+        syncService.syncDailyPrice();
         log.info("Daily sync complete.");
     }
 }
