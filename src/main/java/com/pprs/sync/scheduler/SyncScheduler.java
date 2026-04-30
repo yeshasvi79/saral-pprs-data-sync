@@ -23,6 +23,7 @@ public class SyncScheduler {
         // syncService.sync("NSE");
         // syncService.sync("BSE");
         syncService.syncDailyPrice();
+        syncService.syncCorporateActions();
         log.info("Daily sync complete.");
     }
 }

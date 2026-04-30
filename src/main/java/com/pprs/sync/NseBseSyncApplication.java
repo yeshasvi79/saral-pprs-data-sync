@@ -21,8 +21,12 @@ public class NseBseSyncApplication {
         System.out.println("Sync Data now");
         return args -> {
             // syncService.sync("NSE");
-            syncService.sync("BSE");
+            // syncService.sync("BSE");
             // syncService.syncDailyPrice();
+            syncService.syncCorporateActions();
+
+        // Or test a specific range
+        // syncService.syncCorporateActions(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31));
         };
     }
 }
