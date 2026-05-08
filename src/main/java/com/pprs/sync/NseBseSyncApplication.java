@@ -22,8 +22,8 @@ public class NseBseSyncApplication {
         return args -> {
             // syncService.sync("NSE");
             // syncService.sync("BSE");
-            // syncService.syncDailyPrice();
-            syncService.syncCorporateActions();
+             syncService.syncDailyPrice();
+            // syncService.syncCorporateActions();
 
         // Or test a specific range
         // syncService.syncCorporateActions(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31));
