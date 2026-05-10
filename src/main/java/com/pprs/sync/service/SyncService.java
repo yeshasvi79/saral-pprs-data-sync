@@ -32,6 +32,9 @@ public class SyncService {
     private final BseFetcher bseFetcher;
     private final BseDailyPriceFetcher bseDailyPriceFetcher;
     private final CorporateActionFetcher corporateActionFetcher;
+
+    private final NotificationService notificationService;
+
     private final JdbcTemplate jdbcTemplate;
 
     @Value("${app.archive.dir}")
@@ -40,11 +43,13 @@ public class SyncService {
     public SyncService(NseFetcher nseFetcher, BseFetcher bseFetcher,
         BseDailyPriceFetcher bseDailyPriceFetcher,
         CorporateActionFetcher corporateActionFetcher,
+                   NotificationService notificationService,
                        JdbcTemplate jdbcTemplate) {
         this.nseFetcher  = nseFetcher;
         this.bseFetcher  = bseFetcher;
         this.bseDailyPriceFetcher = bseDailyPriceFetcher;
         this.corporateActionFetcher = corporateActionFetcher;
+        this.notificationService = notificationService;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -93,13 +98,25 @@ public class SyncService {
                 ? nseFetcher.fetch()
                 : bseFetcher.fetch();
 
+            if (securities.isEmpty()) {
+                log.warn("{} Securities Master: empty response received", exchange);
+                notificationService.notifyEmpty(
+                    exchange + " Securities Master", LocalDate.now());
+                return;
+            }
+
             archive(securities, exchange);
             upsertAll(securities);
 
             log.info("{}: upserted {} records", exchange, securities.size());
 
+            notificationService.notifySuccess(
+                exchange + " Securities Master", securities.size(), LocalDate.now());
+
         } catch (Exception e) {
             log.error("{} sync failed", exchange, e);
+            notificationService.notifyFailure(
+                exchange + " Securities Master", LocalDate.now(), e);
         }
     }
 
@@ -121,11 +138,25 @@ public class SyncService {
     public void syncDailyPrice() {
         try {
             List<BseDailyPrice> records = bseDailyPriceFetcher.fetchLatest();
+
+            if (records.isEmpty()) {
+                log.warn("BSE Daily Price: empty response received for {}",
+                    LocalDate.now());
+                notificationService.notifyEmpty("BSE Daily Price", LocalDate.now());
+                return;
+            }
+
             upsertDailyPrice(records);
+            
             log.info("BSE daily price: upserted {} records for {}",
                 records.size(), records.get(0).getTradeDate());
+
+            notificationService.notifySuccess(
+                "BSE Daily Price", records.size(), records.get(0).getTradeDate());
         } catch (Exception e) {
             log.error("BSE daily price sync failed", e);
+            notificationService.notifyFailure(
+                "BSE Daily Price", LocalDate.now(), e);
         }
     }
 
@@ -133,10 +164,26 @@ public class SyncService {
     public void syncCorporateActions() {
         try {
             List<CorporateAction> actions = corporateActionFetcher.fetchLatest();
+
+            if (actions.isEmpty()) {
+                log.warn("NSE Corporate Actions: empty response received for {}",
+                    LocalDate.now());
+                notificationService.notifyEmpty(
+                    "NSE Corporate Actions", LocalDate.now());
+                return;
+            }
+
             upsertCorporateActions(actions);
+            
             log.info("Corporate actions: upserted {} records", actions.size());
+
+            notificationService.notifySuccess(
+                "NSE Corporate Actions", actions.size(), LocalDate.now());
+
         } catch (Exception e) {
             log.error("Corporate actions sync failed", e);
+            notificationService.notifyFailure(
+                "NSE Corporate Actions", LocalDate.now(), e);
         }
     }
 
@@ -144,11 +191,30 @@ public class SyncService {
     public void syncCorporateActions(LocalDate fromDate, LocalDate toDate) {
         try {
             List<CorporateAction> actions = corporateActionFetcher.fetch(fromDate, toDate);
+
+            if (actions.isEmpty()) {
+            log.warn("NSE Corporate Actions: empty response received for range {} to {}",
+                fromDate, toDate);
+            notificationService.notifyEmpty(
+                "NSE Corporate Actions (" + fromDate + " to " + toDate + ")",
+                toDate);
+            return;
+            }
+
             upsertCorporateActions(actions);
+            
             log.info("Corporate actions: upserted {} records from {} to {}",
                 actions.size(), fromDate, toDate);
+
+            notificationService.notifySuccess(
+                "NSE Corporate Actions (" + fromDate + " to " + toDate + ")",
+                actions.size(), toDate);
+        
         } catch (Exception e) {
             log.error("Corporate actions sync failed for range {} to {}", fromDate, toDate, e);
+            notificationService.notifyFailure(
+                "NSE Corporate Actions (" + fromDate + " to " + toDate + ")",
+                toDate, e);
         }
     }
 

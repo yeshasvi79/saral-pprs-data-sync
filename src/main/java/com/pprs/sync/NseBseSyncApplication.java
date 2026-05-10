@@ -20,9 +20,9 @@ public class NseBseSyncApplication {
     CommandLineRunner runOnStartup(SyncService syncService) {
         System.out.println("Sync Data now");
         return args -> {
-            // syncService.sync("NSE");
+            syncService.sync("NSE");
             // syncService.sync("BSE");
-             syncService.syncDailyPrice();
+            // syncService.syncDailyPrice();
             // syncService.syncCorporateActions();
 
         // Or test a specific range
