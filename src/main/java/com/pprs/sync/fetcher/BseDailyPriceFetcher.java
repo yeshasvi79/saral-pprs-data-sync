@@ -28,7 +28,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pprs.sync.model.BseDailyPrice;
+import com.pprs.sync.model.DailyPrice;
 
 @Component
 public class BseDailyPriceFetcher {
@@ -60,10 +60,10 @@ public class BseDailyPriceFetcher {
         this.objectMapper = objectMapper;
     }
 
-    public List<BseDailyPrice> fetch(LocalDate date) throws Exception {
+    public List<DailyPrice> fetch(LocalDate date) throws Exception {
         // Try BSE ZIP first
         try {
-            List<BseDailyPrice> records = fetchFromBse(date);
+            List<DailyPrice> records = fetchFromBse(date);
             if (!records.isEmpty()) {
                 log.info("BSE ZIP: fetched {} records for {}", records.size(), date);
                 return records;
@@ -78,13 +78,13 @@ public class BseDailyPriceFetcher {
         return fetchFromYahoo(date);
     }
 
-    public List<BseDailyPrice> fetchLatest() throws Exception {
+    public List<DailyPrice> fetchLatest() throws Exception {
         return fetch(previousTradingDay());
     }
 
     // ─── BSE ZIP ────────────────────────────────────────────────────────────────
 
-    private List<BseDailyPrice> fetchFromBse(LocalDate date) throws Exception {
+    private List<DailyPrice> fetchFromBse(LocalDate date) throws Exception {
         String url = buildBseUrl(date);
         log.info("Fetching BSE daily price ZIP from: {}", url);
 
@@ -106,7 +106,7 @@ public class BseDailyPriceFetcher {
         return parseZip(response.getBody(), date);
     }
 
-    private List<BseDailyPrice> parseZip(byte[] zipBytes, LocalDate date) throws Exception {
+    private List<DailyPrice> parseZip(byte[] zipBytes, LocalDate date) throws Exception {
         try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
@@ -119,8 +119,8 @@ public class BseDailyPriceFetcher {
         return Collections.emptyList();
     }
 
-    private List<BseDailyPrice> parseBseCsv(InputStream is, LocalDate date) throws Exception {
-        List<BseDailyPrice> records = new ArrayList<>();
+    private List<DailyPrice> parseBseCsv(InputStream is, LocalDate date) throws Exception {
+        List<DailyPrice> records = new ArrayList<>();
         BufferedReader reader = new BufferedReader(
             new InputStreamReader(is, StandardCharsets.UTF_8)
         );
@@ -138,10 +138,11 @@ public class BseDailyPriceFetcher {
             if (cols.length < 11) continue;
 
             try {
-                records.add(new BseDailyPrice(
+                records.add(new DailyPrice(
                     clean(cols[0]),           // CODE
                     clean(cols[10]),          // ISIN_CODE
                     clean(cols[1]),           // NAME
+                    "BSE",                    // exchange
                     parseBigDecimal(cols[2]), // OPEN
                     parseBigDecimal(cols[3]), // HIGH
                     parseBigDecimal(cols[4]), // LOW
@@ -163,17 +164,17 @@ public class BseDailyPriceFetcher {
 
     // 
     
-    private List<BseDailyPrice> fetchFromYahoo(LocalDate date) {
+    private List<DailyPrice> fetchFromYahoo(LocalDate date) {
         List<String> bseCodes = jdbcTemplate.queryForList(FETCH_BSE_CODES_SQL, String.class);
         log.info("Yahoo Finance fallback: fetching {} BSE symbols for {}", bseCodes.size(), date);
     
-        List<BseDailyPrice> records = new ArrayList<>();
+        List<DailyPrice> records = new ArrayList<>();
         int successCount            = 0;
         int failCount               = 0;
     
         for (String code : bseCodes) {
             try {
-                BseDailyPrice price = fetchYahooSymbol(code, date, 0, 0); // periods unused
+                DailyPrice price = fetchYahooSymbol(code, date, 0, 0); // periods unused
                 if (price != null) {
                     records.add(price);
                     successCount++;
@@ -282,7 +283,7 @@ public class BseDailyPriceFetcher {
         catch (Exception e) { return null; }
     }
 
-    private BseDailyPrice fetchYahooSymbol(String code, LocalDate date,
+    private DailyPrice fetchYahooSymbol(String code, LocalDate date,
             long periodStart, long periodEnd) throws Exception {
     String url = String.format(YAHOO_JSON_URL, code);
     log.warn("Yahoo JSON URL: {}", url);
@@ -304,7 +305,7 @@ public class BseDailyPriceFetcher {
     return parseYahooJson(response.getBody(), code, date);
     }
 
-    private BseDailyPrice parseYahooJson(String json, String code, LocalDate date) throws Exception {
+    private DailyPrice parseYahooJson(String json, String code, LocalDate date) throws Exception {
     JsonNode root = objectMapper.readTree(json);
 
     // Response path: chart.result[0]
@@ -340,10 +341,11 @@ public class BseDailyPriceFetcher {
     return null;
     }
 
-    return new BseDailyPrice(
+    return new DailyPrice(
     code,
     null,      // ISIN — not in Yahoo response, enrich via securities_master join
     null,      // name — not in Yahoo response
+    "BSE",
     open,
     high,
     low,

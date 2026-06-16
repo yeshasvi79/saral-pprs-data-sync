@@ -12,7 +12,7 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.io.BufferedWriter;
 
-import com.pprs.sync.model.BseDailyPrice;
+import com.pprs.sync.model.DailyPrice;
 import com.pprs.sync.model.CorporateAction;
 import com.pprs.sync.model.Security;
 import com.pprs.sync.repository.SecurityRepository;
@@ -20,6 +20,7 @@ import com.pprs.sync.fetcher.NseFetcher;
 import com.pprs.sync.fetcher.BseDailyPriceFetcher;
 import com.pprs.sync.fetcher.BseFetcher;
 import com.pprs.sync.fetcher.CorporateActionFetcher;
+import com.pprs.sync.fetcher.NseDailyPriceFetcher;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,6 +32,7 @@ public class SyncService {
     private final NseFetcher nseFetcher;
     private final BseFetcher bseFetcher;
     private final BseDailyPriceFetcher bseDailyPriceFetcher;
+    private final NseDailyPriceFetcher nseDailyPriceFetcher;
     private final CorporateActionFetcher corporateActionFetcher;
 
     private final NotificationService notificationService;
@@ -42,12 +44,14 @@ public class SyncService {
 
     public SyncService(NseFetcher nseFetcher, BseFetcher bseFetcher,
         BseDailyPriceFetcher bseDailyPriceFetcher,
+        NseDailyPriceFetcher nseDailyPriceFetcher,
         CorporateActionFetcher corporateActionFetcher,
                    NotificationService notificationService,
                        JdbcTemplate jdbcTemplate) {
         this.nseFetcher  = nseFetcher;
         this.bseFetcher  = bseFetcher;
         this.bseDailyPriceFetcher = bseDailyPriceFetcher;
+        this.nseDailyPriceFetcher   = nseDailyPriceFetcher;
         this.corporateActionFetcher = corporateActionFetcher;
         this.notificationService = notificationService;
         this.jdbcTemplate = jdbcTemplate;
@@ -67,11 +71,11 @@ public class SyncService {
         """;
 
     private static final String DAILY_PRICE_UPSERT_SQL = """
-        INSERT INTO bse_daily_price
-            (code, isin, name, open, high, low, close, prev_close,
+        INSERT INTO daily_price
+            (code, isin, name, exchange, open, high, low, close, prev_close,
                 volume, turnover, total_trades, trade_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (code, trade_date) DO UPDATE SET
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (code, exchange, trade_date) DO UPDATE SET
             close        = EXCLUDED.close,
             volume       = EXCLUDED.volume,
             turnover     = EXCLUDED.turnover,
@@ -135,9 +139,9 @@ public class SyncService {
         jdbcTemplate.batchUpdate(UPSERT_SQL, batchArgs);
     }
 
-    public void syncDailyPrice() {
+    public void syncBseDailyPrice() {
         try {
-            List<BseDailyPrice> records = bseDailyPriceFetcher.fetchLatest();
+            List<DailyPrice> records = bseDailyPriceFetcher.fetchLatest();
 
             if (records.isEmpty()) {
                 log.warn("BSE Daily Price: empty response received for {}",
@@ -157,6 +161,29 @@ public class SyncService {
             log.error("BSE daily price sync failed", e);
             notificationService.notifyFailure(
                 "BSE Daily Price", LocalDate.now(), e);
+        }
+    }
+
+    public void syncNseDailyPrice() {
+        try {
+            List<DailyPrice> records = nseDailyPriceFetcher.fetchLatest();
+    
+            if (records.isEmpty()) {
+                log.warn("NSE Daily Price: empty response for {}", LocalDate.now());
+                notificationService.notifyEmpty("NSE Daily Price", LocalDate.now());
+                return;
+            }
+    
+            upsertDailyPrice(records);
+    
+            log.info("NSE daily price: upserted {} records for {}",
+                records.size(), records.get(0).getTradeDate());
+            notificationService.notifySuccess(
+                "NSE Daily Price", records.size(), records.get(0).getTradeDate());
+    
+        } catch (Exception e) {
+            log.error("NSE daily price sync failed", e);
+            notificationService.notifyFailure("NSE Daily Price", LocalDate.now(), e);
         }
     }
 
@@ -238,11 +265,11 @@ public class SyncService {
         jdbcTemplate.batchUpdate(CORPORATE_ACTION_UPSERT_SQL, args);
     }
     
-    private void upsertDailyPrice(List<BseDailyPrice> records) {
+    private void upsertDailyPrice(List<DailyPrice> records) {
         List<Object[]> args = records.stream()
             .map(r -> new Object[]{
                 r.getCode(), r.getIsin(), r.getName(),
-                r.getOpen(), r.getHigh(), r.getLow(),
+                r.getExchange(), r.getOpen(), r.getHigh(), r.getLow(),
                 r.getClose(), r.getPrevClose(),
                 r.getVolume(), r.getTurnover(),
                 r.getTotalTrades(), r.getTradeDate()

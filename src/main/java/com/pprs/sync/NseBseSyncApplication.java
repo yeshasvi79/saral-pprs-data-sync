@@ -12,17 +12,16 @@ import com.pprs.sync.service.SyncService;
 @EnableScheduling
 public class NseBseSyncApplication {
     public static void main(String[] args) {
-        System.out.println("Application Started");
         SpringApplication.run(NseBseSyncApplication.class, args);
     }
 
     @Bean
     CommandLineRunner runOnStartup(SyncService syncService) {
-        System.out.println("Sync Data now");
         return args -> {
-            syncService.sync("NSE");
+            // syncService.sync("NSE");
             // syncService.sync("BSE");
-            // syncService.syncDailyPrice();
+            syncService.syncBseDailyPrice();
+            // syncService.syncNseDailyPrice();
             // syncService.syncCorporateActions();
 
         // Or test a specific range

@@ -17,13 +17,20 @@ public class SyncScheduler {
     }
 
     // Runs Mon–Fri at 7:30 AM IST (2:00 AM UTC)
-    @Scheduled(cron = "0 30 7 * * MON-FRI", zone = "Asia/Kolkata")
+    @Scheduled(cron = "0 38 7 * * MON-FRI", zone = "Asia/Kolkata")
     public void runDailySync() {
         log.info("Starting daily sync...");
-        // syncService.sync("NSE");
+        syncService.sync("NSE");
         // syncService.sync("BSE");
-        syncService.syncDailyPrice();
-        syncService.syncCorporateActions();
+        // syncService.syncBseDailyPrice();
+        //syncService.syncCorporateActions();
         log.info("Daily sync complete.");
+    }
+
+    // NSE Daily Price — 6:00 PM IST, Mon–Fri (same time as BSE)
+    @Scheduled(cron = "${app.schedule.nse-daily-price}", zone = "Asia/Kolkata")
+    public void syncNseDailyPrice() {
+        log.info("Scheduler triggered — NSE Daily Price");
+        syncService.syncNseDailyPrice();
     }
 }
