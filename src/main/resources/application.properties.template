@@ -1,0 +1,54 @@
+# ─── Datasource ───────────────────────────────────────────────────────────────
+spring.datasource.url=jdbc:postgresql://localhost:5432/fintech_db
+spring.datasource.username=fintech_user
+spring.datasource.password=yourpassword
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# ─── JPA / Hibernate ──────────────────────────────────────────────────────────
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=none
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.format_sql=false
+spring.sql.init.mode=never
+
+# ─── Mail (Gmail SMTP) ────────────────────────────────────────────────────────
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=your-email@gmail.com
+spring.mail.password=abcdabcdabcdabcd        # 16 chars, no spaces
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.starttls.required=true
+spring.mail.properties.mail.smtp.ssl.trust=smtp.gmail.com
+spring.mail.properties.mail.smtp.connectiontimeout=5000
+spring.mail.properties.mail.smtp.timeout=5000
+spring.mail.properties.mail.smtp.writetimeout=5000
+
+# ─── Notification ─────────────────────────────────────────────────────────────
+app.notification.from=your-email@gmail.com
+app.notification.to=alerts@example.com,dev@example.com
+app.notification.enabled=true
+
+# ─── Archive ──────────────────────────────────────────────────────────────────
+app.archive.dir=/Users/yeshasvi/Courses/Repos/saral-pprs-data-sync/archive
+
+# ─── Scheduler (Asia/Kolkata) ─────────────────────────────────────────────────
+app.schedule.nse-securities=0 30 7 * * MON-FRI
+app.schedule.bse-securities=0 30 7 * * MON-FRI
+app.schedule.bse-daily-price=0 0 18 * * MON-FRI
+app.schedule.nse-daily-price=0 0 18 * * MON-FRI
+app.schedule.corporate-actions=0 0 9,12,15,18,20 * * MON-FRI
+
+# ─── Scheduling thread pool ───────────────────────────────────────────────────
+spring.task.scheduling.pool.size=5
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
+logging.level.root=INFO
+logging.level.com.pprs.sync=DEBUG
+logging.level.org.springframework.mail=INFO
+logging.level.org.hibernate.SQL=OFF
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n
+
+# ─── Actuator (optional — useful for health checks later) ────────────────────
+management.endpoints.web.exposure.include=health,info
+management.endpoint.health.show-details=always
